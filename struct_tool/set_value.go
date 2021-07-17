@@ -1,4 +1,4 @@
-package struct
+package struct_tool
 
 import (
 	"reflect"
