@@ -4,25 +4,24 @@
 
 ## What's in it
 
-- [ ] color
+- [x] captcha
+- [x] color
 - [ ] redis
-- [ ] reCaptcha
-- [ ] logging
-- [ ] random_tool
+- [x] logging
+- [x] random: generate random strings/numbers
 - [ ] s3
 - [ ] test_tool
-- [ ] array_tool
-- [ ] map_tool
+- [x] array_tool
+- [x] map_tool
 - [ ] cron
-- [ ] image
+- [x] image
 - [ ] jwt
 - [ ] mailgun
 - [ ] pagination
 - [ ] password
-- [ ] phone
+- [x] phone
 - [ ] refresh_token
 - [ ] signature
-- [ ] thumbnail
-- [ ] time
+- [x] timezone
 - [ ] twilio
-- [ ] update_tool
+- [x] struct: update object values
