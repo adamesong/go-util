@@ -2,6 +2,7 @@ package struct_tool
 
 import (
 	"reflect"
+	"strconv"
 )
 
 // SetUpdateValue 将updateInfoObj这个结构体实例中的各项更新至originObj中各同名项中。
@@ -45,5 +46,66 @@ func SetUpdateValue(originObjPtr, updateInfoObjPtr interface{}) (changed bool, o
 		}
 	}
 	// 此时设置完之后，originObjPtr 指针所指向的 originObj的值已经被更新
+	return
+}
+
+// GetStringFromObj obj为结构体实例
+// 与test_tool中的GetSubTestName类似
+// 返回值格式：keyName_keyValueString_keyName_keyValueString
+func GetStringFromObj(obj interface{}) (keyString string) {
+	s := reflect.TypeOf(obj)
+	v := reflect.ValueOf(obj)
+	first := 0
+loop:
+	for i := 0; i < s.NumField(); i++ { // s.NumField() 是这个结构体的Field的个数
+		// 如果某项是零值，则跳过此项
+		if v.Field(i).IsZero() {
+			continue loop
+		} else {
+			// 否则，记录非0值的个数
+			first += 1
+		}
+		// 如果不是第一个元素，则在前面加"_"
+		if first != 1 {
+			keyString += "_"
+		}
+		// 获得struct的项的名称和类型
+		k := s.Field(i).Name
+		vType := v.Field(i).Type().String()
+		// 处理struct的项的值，处理成string
+		if vType == "string" {
+			keyString += k + "_" + v.Field(i).String()
+		} else if vType == "int" {
+			keyString += k + "_" + strconv.Itoa(int(v.Field(i).Int()))
+		} else if vType == "uint" {
+			keyString += k + "_" + strconv.Itoa(int(v.Field(i).Uint()))
+		} else if vType == "bool" {
+			keyString += k + "_" + strconv.FormatBool(v.Field(i).Bool())
+		} else if vType == "[]string" {
+			for j, sub := range v.Field(i).Interface().([]string) {
+				if j != 0 {
+					keyString += "_" + sub
+				} else {
+					keyString += k + "_" + sub
+				}
+			}
+		} else if vType == "[]int" {
+			for j, sub := range v.Field(i).Interface().([]int) {
+				if j != 0 {
+					keyString += "_" + strconv.Itoa(sub)
+				} else {
+					keyString += k + "_" + strconv.Itoa(sub)
+				}
+			}
+		} else if vType == "[]uint" {
+			for j, sub := range v.Field(i).Interface().([]uint) {
+				if j != 0 {
+					keyString += "_" + strconv.Itoa(int(sub))
+				} else {
+					keyString += k + "_" + strconv.Itoa(int(sub))
+				}
+			}
+		}
+	}
 	return
 }

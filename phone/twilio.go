@@ -14,7 +14,7 @@ import (
 type Twilio struct {
 	AccountSID  string
 	AuthToken   string
-	PhoneNumber string
+	PhoneNumber string // 格式：+17781231234
 }
 
 // https://www.twilio.com/blog/2017/09/send-text-messages-golang.html
