@@ -27,3 +27,11 @@ func ParsePhone(mobile string) (countryCode, regionCode, nationalNumber string, 
 	}
 	return
 }
+
+// Phone 带有国家码的电话信息
+type Phone struct {
+	CountryCode    string `json:"country_code"`    // 例如：1
+	RegionCode     string `json:"region_code"`     // 例如：ca, us
+	NationalNumber string `json:"national_number"` // 例如：(778) 778-7878
+	IsValidNumber  bool   `json:"is_valid_number"` // 是否有效的电话号码：true, false
+}
