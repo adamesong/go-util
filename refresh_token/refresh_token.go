@@ -23,7 +23,7 @@ type RefreshToken struct {
 }
 
 // NotExpired 一个refresh_token是否过了有效期
-func (token RefreshToken) Expired() bool {
+func (token *RefreshToken) Expired() bool {
 	// refreshDuration, _ := time.ParseDuration(conf.RefreshTokenDuration)
 	return time.Now().After(token.ExpiresAt)
 }
