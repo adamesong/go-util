@@ -13,6 +13,7 @@
 - [x] jwt
 - [x] logging
 - [x] map_tool
+- [x] oauth2: google
 - [x] pagination
 - [x] password
 - [x] phone: phone number; twilio
