@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.40.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/disintegration/imaging v1.6.2
+	github.com/futurenda/google-auth-id-token-verifier v0.0.0-20170311140316-2a5b89f28b7e
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/google/uuid v1.3.0
 	github.com/mailgun/mailgun-go/v4 v4.5.2

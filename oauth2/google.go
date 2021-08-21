@@ -1,10 +1,28 @@
 package oauth2
 
 import (
-	"context"
-
-	"google.golang.org/api/idtoken"
+	googleAuthIDTokenVerifier "github.com/futurenda/google-auth-id-token-verifier"
 )
+
+// https://github.com/futurenda/google-auth-id-token-verifier
+
+// idToken: this comes from your web or mobile app maybe
+// googleClientId: from credentials in the Google dev console
+func VerifyIdToken(idToken, googleOauth2ClientID string) (claimSet *googleAuthIDTokenVerifier.ClaimSet, err error) {
+	v := googleAuthIDTokenVerifier.Verifier{}
+	if err := v.VerifyIDToken(idToken, []string{
+		googleOauth2ClientID, // same as aud
+	}); err != nil {
+		return nil, err
+	} else {
+		if claimSet, err := googleAuthIDTokenVerifier.Decode(idToken); err != nil {
+			return nil, err
+		} else {
+			return claimSet, nil
+		}
+		// claimSet.Iss,claimSet.Email ... (See claimset.go)
+	}
+}
 
 // https://developers.google.com/identity/sign-in/web/backend-auth?authuser=6#verify-the-integrity-of-the-id-token
 
@@ -26,31 +44,31 @@ import (
 
 // https://stackoverflow.com/questions/36716117/validating-google-sign-in-id-token-in-go
 // https://developers.google.com/identity/sign-in/web/backend-auth#using-a-google-api-client-library
-func VerifyIdToken(idToken, googleOauth2WebClientID string) (email, name, firstName, lastName string, err error) {
-	var token string // this comes from your web or mobile app maybe
-	// const googleClientId ""=  // from credentials in the Google dev console
+// func VerifyIdToken(idToken, googleOauth2WebClientID string) (email, name, firstName, lastName string, err error) {
+// 	var token string // this comes from your web or mobile app maybe
+// 	// const googleClientId ""=  // from credentials in the Google dev console
 
-	// tokenValidator, err := idtoken.NewValidator(context.Background(), option.WithAPIKey(conf.GoogleSerivceAPIKey))
-	tokenValidator, err := idtoken.NewValidator(context.Background())
+// 	// tokenValidator, err := idtoken.NewValidator(context.Background(), option.WithAPIKey(conf.GoogleSerivceAPIKey))
+// 	tokenValidator, err := idtoken.NewValidator(context.Background())
 
-	if err != nil {
-		return "", "", "", "", err
-	}
+// 	if err != nil {
+// 		return "", "", "", "", err
+// 	}
 
-	payload, err := tokenValidator.Validate(context.Background(), token, googleOauth2WebClientID)
-	if err != nil {
-		return "", "", "", "", err
-	}
-	// "email": "testuser@gmail.com",
-	//  "email_verified": "true",
-	//  "name" : "Test User",
-	//  "picture": "https://lh4.googleusercontent.com/-kYgzyAWpZzJ/ABCDEFGHI/AAAJKLMNOP/tIXL9Ir44LE/s99-c/photo.jpg",
-	//  "given_name": "Test",
-	//  "family_name": "User",
-	//  "locale": "en"
-	email = payload.Claims["email"].(string)
-	name = payload.Claims["name"].(string)
-	firstName = payload.Claims["given_name"].(string)
-	lastName = payload.Claims["family_name"].(string)
-	return email, name, firstName, lastName, nil
-}
+// 	payload, err := tokenValidator.Validate(context.Background(), token, googleOauth2WebClientID)
+// 	if err != nil {
+// 		return "", "", "", "", err
+// 	}
+// 	// "email": "testuser@gmail.com",
+// 	//  "email_verified": "true",
+// 	//  "name" : "Test User",
+// 	//  "picture": "https://lh4.googleusercontent.com/-kYgzyAWpZzJ/ABCDEFGHI/AAAJKLMNOP/tIXL9Ir44LE/s99-c/photo.jpg",
+// 	//  "given_name": "Test",
+// 	//  "family_name": "User",
+// 	//  "locale": "en"
+// 	email = payload.Claims["email"].(string)
+// 	name = payload.Claims["name"].(string)
+// 	firstName = payload.Claims["given_name"].(string)
+// 	lastName = payload.Claims["family_name"].(string)
+// 	return email, name, firstName, lastName, nil
+// }
