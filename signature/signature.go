@@ -211,16 +211,19 @@ func GetStrToSign(urlPath, reqMethod string, reqForm url.Values, reqBody []byte,
 		var strPart string
 		// 如果query中的参数仅一个，直接拼接，例如:state = 1
 		if len(params[key]) == 1 {
-			strPart = fmt.Sprintf("%v=%v", key, url.QueryEscape(params[key][0]))
+			// 这里同时将 queryEscape后的 "+" 替换成 "%20"
+			strPart = fmt.Sprintf("%v=%v", key, strings.ReplaceAll(url.QueryEscape(params[key][0]), "+", "%20"))
 		} else if len(params[key]) > 1 {
 			// 如果query中的某参数有若干值，则先排序后，顺序拼接，例如：space=1&space=2&space=3
 			vArray := params[key]
 			sort.Strings(vArray)
 			for vI, vStr := range vArray {
+				// 这里同时将 queryEscape后的 "+" 替换成 "%20"
+				percentEcodedStr := strings.ReplaceAll(url.QueryEscape(vStr), "+", "%20")
 				if vI == 0 {
-					strPart = fmt.Sprintf("%v=%v", key, url.QueryEscape(vStr))
+					strPart = fmt.Sprintf("%v=%v", key, percentEcodedStr)
 				} else {
-					strPart = strPart + fmt.Sprintf("&%v=%v", key, url.QueryEscape(vStr))
+					strPart = strPart + fmt.Sprintf("&%v=%v", key, percentEcodedStr)
 				}
 			}
 		}
