@@ -28,7 +28,8 @@ func (c *GoogleCaptcha) Verify() (verified bool, errCodes string) {
 		ErrorCodes []string `json:"error-codes"`
 	}
 
-	postUrl := "https://www.google.com/recaptcha/api/siteverify"
+	// postUrl := "https://www.google.com/recaptcha/api/siteverify"
+	postUrl := "https://www.recaptcha.net/recaptcha/api/siteverify" // https://developers.google.com/recaptcha/docs/faq#can-i-use-recaptcha-globally
 	param := url.Values{}
 	param.Add("secret", c.SecretKey)
 	param.Add("response", c.Token)
