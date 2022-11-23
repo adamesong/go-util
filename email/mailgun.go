@@ -45,7 +45,7 @@ func SendTaggedMessage(domain, apiKey string) (string, error) {
 	}
 }
 
-func (mgObj *Mailgun) SendSimpleMessage(from, subject, text, to string) {
+func (mgObj *Mailgun) SendSimpleMessage(from, subject, text, template, to string) {
 	mg := mailgun.NewMailgun(mgObj.Domain, mgObj.APIKey)
 	m := mg.NewMessage(
 		from,    // "Excited User <mailgun@notice.xxx.ca>",
@@ -53,6 +53,10 @@ func (mgObj *Mailgun) SendSimpleMessage(from, subject, text, to string) {
 		text,    // "Testing some Mailgun awesomeness!",
 		to,      // "xxx@xx.com",
 	)
+
+	if template != "" {
+		m.SetTemplate(template)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -68,10 +72,11 @@ func (mgObj *Mailgun) SendSimpleMessage(from, subject, text, to string) {
 
 // https://documentation.mailgun.com/en/latest/user_manual.html#batch-sending
 // The maximum number of recipients allowed for Batch Sending is 1,000.
-// to的形式：{
-//   "user1@example.com" : {"var1": "ABC123456789", "var2": "adfsa"},
-//   "user2@example.com" : {"var1": "ZXY987654321", "var2": "34123"}
-// }
+//
+//	to的形式：{
+//	  "user1@example.com" : {"var1": "ABC123456789", "var2": "adfsa"},
+//	  "user2@example.com" : {"var1": "ZXY987654321", "var2": "34123"}
+//	}
 func (mgObj *Mailgun) SendBatchMessageLessThan1k(from, subject, text, template string, to map[string]interface{}) {
 	mg := mailgun.NewMailgun(mgObj.Domain, mgObj.APIKey)
 	m := mg.NewMessage(from, subject, text)
