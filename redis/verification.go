@@ -42,6 +42,28 @@ func (v *Verification) SetUserEmailVerifyCode(userID string, email string) (stri
 	return code, err
 }
 
+// 先尝试获取缓存中保存的Email验证码，如没有，则新设置，效果同SetUserEmailVerifyCode；如有，则取出此code，并重新设置此code的有效期。
+// 这样保证多次设置 UserEmailVerifyCode 获得的code都是相同的
+func (v *Verification) GetSetUserEmailVerifyCode(userID, email string) (code string, err error) {
+	key := GetUserEmailCacheKey(userID, email)
+
+	// 先获取
+	if value, redisErr := v.Redis.Get(key); redisErr != nil {
+		// 如没有获取到，redisErr为“redis: nil”，code为空string
+		code = ""
+	} else {
+		code = string(value)
+	}
+
+	// 设置
+	if code == "" {
+		code = random.RandomString(v.EmailCodeLength)
+	}
+
+	err = v.Redis.Set(GetUserEmailCacheKey(userID, email), code, v.EmailCodeTimeout)
+	return code, err
+}
+
 // SetEmailVerifyCode 在缓存中保存Email验证码，有效时间在config.ini中设置，不需要userID
 func (v *Verification) SetEmailVerifyCode(email string) (string, error) {
 	code := random.RandomNumber(v.EmailCodeLength)
