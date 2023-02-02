@@ -60,7 +60,7 @@ func (v *Verification) GetSetUserEmailVerifyCode(userID, email string) (code str
 		code = random.RandomString(v.EmailCodeLength)
 	}
 
-	err = v.Redis.Set(GetUserEmailCacheKey(userID, email), code, v.EmailCodeTimeout)
+	err = v.Redis.Set(key, code, v.EmailCodeTimeout)
 	return code, err
 }
 
@@ -68,6 +68,26 @@ func (v *Verification) GetSetUserEmailVerifyCode(userID, email string) (code str
 func (v *Verification) SetEmailVerifyCode(email string) (string, error) {
 	code := random.RandomNumber(v.EmailCodeLength)
 	err := v.Redis.Set(GetEmailCacheKey(email), code, v.EmailCodeTimeout)
+	return code, err
+}
+
+func (v *Verification) GetSetEmailVerifyCode(email string) (code string, err error) {
+	key := GetEmailCacheKey(email)
+
+	// 先获取
+	if value, redisErr := v.Redis.Get(key); redisErr != nil {
+		// 如没有获取到，redisErr为“redis: nil”，code为空string
+		code = ""
+	} else {
+		code = string(value)
+	}
+
+	// 设置
+	if code == "" {
+		code = random.RandomNumber(v.EmailCodeLength)
+	}
+
+	err = v.Redis.Set(key, code, v.EmailCodeTimeout)
 	return code, err
 }
 
