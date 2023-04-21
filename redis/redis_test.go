@@ -19,7 +19,7 @@ var r = RedisClient{
 
 func TestConnectRedis(t *testing.T) {
 	client := r.Connect()
-	if pong, err := client.Ping().Result(); err != nil {
+	if pong, err := client.Ping(ctx).Result(); err != nil {
 		t.Error(err.Error())
 	} else {
 		assert.Equal(t, "PONG", pong, "redis ping 获得的值"+pong+"不一致")
@@ -33,7 +33,7 @@ func TestCloseConnect(t *testing.T) {
 	if err := client.Close(); err != nil {
 		t.Error(err.Error())
 	}
-	if pong, err := client.Ping().Result(); err != nil {
+	if pong, err := client.Ping(ctx).Result(); err != nil {
 		fmt.Println(pong, err.Error())
 	}
 }
@@ -294,13 +294,14 @@ func TestTTL(t *testing.T) {
 
 				switch tc.Key {
 				case "valid":
+					fmt.Println("duration:", dur)
 					doAssertion.Greater(int(dur/time.Second), 0, "剩余时间应大于0")
 				case "expired":
-					doAssertion.Equal(-2*time.Second, dur, "过期Key不存在时返回值不正确")
+					doAssertion.Equal(-2*time.Nanosecond, dur, "过期Key不存在时返回值不正确")
 				case "key_not_exists":
-					doAssertion.Equal(-2*time.Second, dur, "不存在的key返回值不正确")
+					doAssertion.Equal(-2*time.Nanosecond, dur, "不存在的key返回值不正确")
 				case "no_expiration":
-					doAssertion.Equal(-1*time.Second, dur, "无有效期(永远存在)时的返回值不正确")
+					doAssertion.Equal(-1*time.Nanosecond, dur, "无有效期(永远存在)时的返回值不正确")
 				}
 			}
 			// 清理数据

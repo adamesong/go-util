@@ -23,7 +23,7 @@ func TestGetSetUserEmailVerifyCode(t *testing.T) {
 
 	// 先确保redis中没有此cache key
 	key := GetUserEmailCacheKey(userID, email)
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// 第一次设置
 	code, _ := v.GetSetUserEmailVerifyCode(userID, email)
@@ -50,7 +50,7 @@ func TestGetSetUserEmailVerifyCode(t *testing.T) {
 	doAssertion.Equal(code, codeSecond)
 
 	// tear down
-	r.Delete(key)
+	_, _ = r.Delete(key)
 }
 
 func TestGetSetEmailVerifyCode(t *testing.T) {
@@ -59,7 +59,7 @@ func TestGetSetEmailVerifyCode(t *testing.T) {
 
 	// 先确保redis中没有此cache key
 	key := GetEmailCacheKey(email)
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// 第一次设置
 	code, _ := v.GetSetEmailVerifyCode(email)
@@ -86,5 +86,5 @@ func TestGetSetEmailVerifyCode(t *testing.T) {
 	doAssertion.Equal(code, codeSecond)
 
 	// tear down
-	r.Delete(key)
+	_, _ = r.Delete(key)
 }
