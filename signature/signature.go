@@ -541,10 +541,8 @@ func (option *SignVerifyOption) VerifySign(body *SignBody) (success bool, errCod
 			success = false
 			return
 		}
-
-		success = true
 	}
-
+	success = true
 	return
 }
 
@@ -558,8 +556,10 @@ func (option *SignOption) GetTestSign(body *SignBody, appKeyForTest string) (sig
 
 	reqForm := url.Values{}
 	reqForm.Add("ak", ak)
-	reqForm.Add("ts", ts)
-	reqForm.Add("nc", nc)
+	if option.UniqueSign {
+		reqForm.Add("ts", ts)
+		reqForm.Add("nc", nc)
+	}
 
 	strToSign, errCode, success := option.GetStrToSign(body)
 	if !success {
