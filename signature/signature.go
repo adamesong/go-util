@@ -23,6 +23,7 @@ import (
 const (
 	ErrorNoQueryParam   = "ErrorNoQueryParam"
 	ErrorWrongAppKey    = "ErrorWrongAppKey"
+	ErrorNoAppKey       = "ErrorNoAppKey"
 	ErrorNoTimestamp    = "ErrorNoTimestamp"
 	ErrorWrongTimestamp = "ErrorWrongTimestamp"
 	ErrorTSExpired      = "ErrorTSExpired"
@@ -257,7 +258,7 @@ func GetStrToSign(urlPath, reqMethod string, reqForm url.Values, reqBody []byte,
 // 验证调用api的签名是否有效，签名sn已经在reqForm中了，参数名为"sn"
 // sign: 通过参数计算出来的签名，用于与请求中的签名sn做对比
 func VerifySign(urlPath, reqMethod string, reqForm url.Values, reqBody []byte, appKeyAndSecret map[string]string, signDuration time.Duration, redisClient *redis.RedisClient) (strToSign, errCode, sign string, success bool) {
-	strToSign, errCode, success = GetStrToSign(urlPath, reqMethod, reqForm, reqBody, appKeyAndSecret, signDuration)
+	strToSign, _, success = GetStrToSign(urlPath, reqMethod, reqForm, reqBody, appKeyAndSecret, signDuration)
 
 	// 获得appKey。这里不再判断appKey是否存在，因为在GetStrToSign()中已经做了判断
 	ak := strings.Join(reqForm["ak"], "")
@@ -301,6 +302,7 @@ func VerifySign(urlPath, reqMethod string, reqForm url.Values, reqBody []byte, a
 		return
 	}
 
+	errCode = ""
 	success = true
 	return
 
@@ -371,9 +373,10 @@ func (option *SignOption) GetStrToSign(body *SignBody) (strToSign string, errCod
 	}
 	// 这里不用reqForm.Get("ak") 是因为 Get("ak")得到的类型是[]string
 	ak := strings.Join(body.ReqForm["ak"], "") // AppKey 用来识别调用方身份 （不是AppSecret，用来加密生成签名。）
+
 	// 判断AppKey是否存在，如果不存在，返回失败
 	if ak == "" {
-		errCode = ErrorWrongAppKey
+		errCode = ErrorNoAppKey
 		return
 	}
 	// ! 这里与判断签名func不同的是：这里未从reqForm中取sn(signature)
@@ -471,6 +474,7 @@ func (option *SignOption) GetStrToSign(body *SignBody) (strToSign string, errCod
 		strToSign = strToSign + "\n" + base64.StdEncoding.EncodeToString([]byte(md5JsonBodyStr))
 	}
 
+	errCode = ""
 	success = true
 
 	return
@@ -486,7 +490,9 @@ func (option *SignVerifyOption) VerifySign(body *SignBody) (success bool, errCod
 		UniqueSign:      option.UniqueSign,
 		SignDuration:    option.SignDuration,
 	}
+
 	strToSign, errCode, success := signOption.GetStrToSign(body)
+
 	// 如果获得strToSign失败，则直接返回
 	if !success {
 		return
@@ -515,6 +521,7 @@ func (option *SignVerifyOption) VerifySign(body *SignBody) (success bool, errCod
 	if sign != sn {
 		errCode = ErrorWrongSign
 		success = false
+		return
 	}
 
 	// 如果是ts和nc都参与的签名验证，则对ts和nc的有效性做判断
@@ -554,21 +561,23 @@ func (option *SignOption) GetTestSign(body *SignBody, appKeyForTest string) (sig
 	uuid, _ := uuid.NewRandom()
 	nc := uuid.String()
 
-	reqForm := url.Values{}
-	reqForm.Add("ak", ak)
+	signedForm = body.ReqForm
+	body.ReqForm.Add("ak", ak)
+
 	if option.UniqueSign {
-		reqForm.Add("ts", ts)
-		reqForm.Add("nc", nc)
+		body.ReqForm.Add("ts", ts)
+		body.ReqForm.Add("nc", nc)
 	}
 
 	strToSign, errCode, success := option.GetStrToSign(body)
+
 	if !success {
 		fmt.Println("err in signature: ", errCode)
+		return
 	}
 	sign = StrToSignHMACSHA256Base64(strToSign, as)
 
-	reqForm.Add("sn", sign)
-	signedForm = reqForm
+	signedForm.Add("sn", sign)
 	signedUri = body.UrlPath + "?" + signedForm.Encode()
 	return
 }
