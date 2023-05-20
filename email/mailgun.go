@@ -70,6 +70,81 @@ func (mgObj *Mailgun) SendSimpleMessage(from, subject, text, template, to string
 	}
 }
 
+// 如mailgun template里的variable是 {{var}} 则用m.AddTemplateVariable(var, value)来设置所有模板，所有的收件人的邮件内容都是一样的
+// 如mailgun template里的variable是 {%recipient.var%} 则用m.AddRecipientAndVariables(r, {"var":value})来设置，每个收件人的邮件内容都是独特的
+func (mgObj *Mailgun) SendSimpleMessageWithTemplateVariables(from, subject, text, template, to string, templateVar map[string]interface{}) error {
+	mg := mailgun.NewMailgun(mgObj.Domain, mgObj.APIKey)
+	m := mg.NewMessage(
+		from,    // "Excited User <XXXXXXXXXXXXXXXXXXXXX>",
+		subject, // "Hello",
+		text,    // "Testing some Mailgun awesomeness!",
+		to,      // "xxx@xx.com",
+	)
+
+	if template != "" {
+		m.SetTemplate(template)
+		if len(templateVar) != 0 {
+			for k, v := range templateVar {
+				if err := m.AddTemplateVariable(k, v); err != nil {
+					return err
+				}
+			}
+		}
+
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	_, id, err := mg.Send(ctx, m)
+	if err != nil {
+		fmt.Println("Mailgun error: ", err)
+		logging.Error(err.Error())
+		return err
+	} else {
+		fmt.Println("Mailgun sent: ", id)
+		return nil
+	}
+}
+
+func (mgObj *Mailgun) SendSimpleMessageWithRecipientAndVariables(from, subject, text, template string, to map[string]interface{}) error {
+	mg := mailgun.NewMailgun(mgObj.Domain, mgObj.APIKey)
+	m := mg.NewMessage(
+		from,    // "Excited User <XXXXXXXXXXXXXXXXXXXXX>",
+		subject, // "Hello",
+		text,    // "Testing some Mailgun awesomeness!",
+	)
+
+	if template != "" {
+		m.SetTemplate(template)
+		if len(to) > 0 {
+			for k, v := range to {
+				// 如mailgun template里的variable是 {{var}} 则用m.AddTemplateVariable(var, value)来设置所有模板，所有的收件人的邮件内容都是一样的
+				// 如mailgun template里的variable是 {%recipient.var%} 则用m.AddRecipientAndVariables(r, {"var":value})来设置，每个收件人的邮件内容都是独特的
+				addRecipientErr := m.AddRecipientAndVariables(k, v.(map[string]interface{}))
+				// fmt.Println("k: ", k)
+				if addRecipientErr != nil {
+					fmt.Println("addRecipientErr: ", addRecipientErr.Error())
+				}
+			}
+		}
+
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	_, id, err := mg.Send(ctx, m)
+	if err != nil {
+		fmt.Println("Mailgun error: ", err)
+		logging.Error(err.Error())
+		return err
+	} else {
+		fmt.Println("Mailgun sent: ", id)
+		return nil
+	}
+}
+
 // https://documentation.mailgun.com/en/latest/user_manual.html#batch-sending
 // The maximum number of recipients allowed for Batch Sending is 1,000.
 //
