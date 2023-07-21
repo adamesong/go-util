@@ -31,7 +31,7 @@ func SetUpdateValue(originObjPtr, updateInfoObjPtr interface{}) (changed bool, o
 			// 从orginalStruct中找到同名的项
 			originField, _ := originStruct.Elem().FieldByName(fieldName)
 			// 如果info中的值与origin的值不同，则将该项的值设为info中的值 (注意：reflect.Value无法用==来判断是否相同，需要用 .Interface())
-			if originValue.Elem().FieldByName(originField.Name).Interface() != infoValue.Elem().Field(i).Interface() {
+			if !reflect.DeepEqual(originValue.Elem().FieldByName(originField.Name).Interface(), infoValue.Elem().Field(i).Interface()) {
 
 				// 记录下变动项的原始值
 				originMap[fieldName] = originValue.Elem().FieldByName(originField.Name).Interface()
