@@ -1,3 +1,7 @@
+/*
+If refresh_token is saved in postgresql's JsonField, use this package.
+But saving refresh_token in a separate table is better.
+*/
 package refresh_token
 
 import (

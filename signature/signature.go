@@ -21,18 +21,20 @@ import (
 )
 
 const (
-	ErrorNoQueryParam   = "ErrorNoQueryParam"
-	ErrorWrongAppKey    = "ErrorWrongAppKey"
-	ErrorNoAppKey       = "ErrorNoAppKey"
-	ErrorNoTimestamp    = "ErrorNoTimestamp"
-	ErrorWrongTimestamp = "ErrorWrongTimestamp"
-	ErrorTSExpired      = "ErrorTSExpired"
-	ErrorNonceTooShort  = "ErrorNonceTooShort"
-	ErrorNonceTooLong   = "ErrorNonceTooLong"
-	ErrorNoSignature    = "ErrorNoSignature"
-	ErrorWrongSign      = "ErrorWrongSign"
-	ErrorNonceExist     = "ErrorNonceExist"
-	ErrorCheckNonce     = "ErrorCheckNonce"
+	ErrorNoQueryParam     = "ErrorNoQueryParam"
+	ErrorWrongAppKey      = "ErrorWrongAppKey"
+	ErrorNoAppKey         = "ErrorNoAppKey"
+	ErrorNoTimestamp      = "ErrorNoTimestamp"
+	ErrorWrongTimestamp   = "ErrorWrongTimestamp"
+	ErrorInvalidTimestamp = "ErrorInvalidTimestamp"
+	ErrorFutureTimestamp  = "ErrorFutureTimestamp"
+	ErrorTSExpired        = "ErrorTSExpired"
+	ErrorNonceTooShort    = "ErrorNonceTooShort"
+	ErrorNonceTooLong     = "ErrorNonceTooLong"
+	ErrorNoSignature      = "ErrorNoSignature"
+	ErrorWrongSign        = "ErrorWrongSign"
+	ErrorNonceExist       = "ErrorNonceExist"
+	ErrorCheckNonce       = "ErrorCheckNonce"
 
 	// 默认的签名有效期：
 	DEFAULT_SIGN_DURATION = time.Second * 300
@@ -166,13 +168,13 @@ func GetStrToSign(urlPath, reqMethod string, reqForm url.Values, reqBody []byte,
 	// 判断timestamp是否是合法的数字
 	tsSeconds, err := strconv.ParseInt(ts, 10, 64)
 	if err != nil {
-		errCode = ErrorWrongTimestamp
+		errCode = ErrorInvalidTimestamp
 		return
 	}
 	tsTime := time.Unix(tsSeconds, 0)
 	// 如果timestamp在现在之后(即请求还未发生)，则返回失败
 	if tsTime.After(time.Now()) {
-		errCode = ErrorWrongTimestamp
+		errCode = ErrorFutureTimestamp
 		return
 	}
 	// 判断timestamp距离现在是否超过有效期，如果超过，则返回失败
@@ -280,6 +282,7 @@ func VerifySign(urlPath, reqMethod string, reqForm url.Values, reqBody []byte, a
 	if sign != sn {
 		errCode = ErrorWrongSign
 		success = false
+		return
 	}
 
 	// 不再判断nc的长度是否长过32个字符，因为在GetStrToSign()中已经做了判断
@@ -390,13 +393,13 @@ func (option *SignOption) GetStrToSign(body *SignBody) (strToSign string, errCod
 		// 判断timestamp是否是合法的数字
 		tsSeconds, err := strconv.ParseInt(ts, 10, 64)
 		if err != nil {
-			errCode = ErrorWrongTimestamp
+			errCode = ErrorInvalidTimestamp
 			return
 		}
 		tsTime := time.Unix(tsSeconds, 0)
 		// 如果timestamp在现在之后(即请求还未发生)，则返回失败
 		if tsTime.After(time.Now()) {
-			errCode = ErrorWrongTimestamp
+			errCode = ErrorFutureTimestamp
 			return
 		}
 		// 判断timestamp距离现在是否超过有效期，如果超过，则返回失败
