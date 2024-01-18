@@ -363,6 +363,7 @@ type SignVerifyOption struct {
 
 // 可替代上面的 GetStrToSign() function，与其目的相同，不同之处：
 // - 增加了ts和nc不参与签名的签名方式
+// - 取消了timestamp在现在之后(即请求还未发生)的判断
 func (option *SignOption) GetStrToSign(body *SignBody) (strToSign string, errCode string, success bool) {
 	// ak: appKey,用来识别调用方身份 （不是AppSecret，用来加密生成签名。）
 	// ts: timestamp, unix timestamp,10位,秒
@@ -398,10 +399,10 @@ func (option *SignOption) GetStrToSign(body *SignBody) (strToSign string, errCod
 		}
 		tsTime := time.Unix(tsSeconds, 0)
 		// 如果timestamp在现在之后(即请求还未发生)，则返回失败
-		if tsTime.After(time.Now()) {
-			errCode = ErrorFutureTimestamp
-			return
-		}
+		// if tsTime.After(time.Now()) {
+		// 	errCode = ErrorFutureTimestamp
+		// 	return
+		// }
 		// 判断timestamp距离现在是否超过有效期，如果超过，则返回失败
 		if option.SignDuration == 0 {
 			option.SignDuration = DEFAULT_SIGN_DURATION
