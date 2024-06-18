@@ -6,6 +6,7 @@ import (
 
 // GetOffset returns the number of records to skip before starting to return the records
 // http://gorm.io/docs/query.html#Offset
+// Deprecated: use GetOffset instead
 func GetOffsetAndPageNum(pageNum, pageSize string, totalAmount int) (offSet, realPageNum, pageSizeInt int) {
 	var page int
 	if pageNum == "" {
@@ -26,6 +27,31 @@ func GetOffsetAndPageNum(pageNum, pageSize string, totalAmount int) (offSet, rea
 		} else { // 如果页码没超出最大范围
 			realPageNum = page
 		}
+	} else { // 如果页码小于0，则返回第一页
+		offSet = 0
+		realPageNum = 1
+	}
+	return
+}
+
+func GetOffset(pageNum, pageSize, totalAmount int64) (offSet, realPageNum int64) {
+
+	if pageNum > 0 { // 如果页码大于0
+
+		offSet = (pageNum - 1) * pageSize
+
+		if offSet >= totalAmount { // 如果页码超出最大范围，则offset设为最后一页之前的数字
+			lastPageSize := totalAmount % pageSize
+			if lastPageSize == 0 { // 如果最后一页是满页
+				offSet = totalAmount - pageSize
+			} else {
+				offSet = totalAmount - lastPageSize
+			}
+			realPageNum = offSet/pageSize + 1
+		} else { // 如果页码没超出最大范围
+			realPageNum = pageNum
+		}
+
 	} else { // 如果页码小于0，则返回第一页
 		offSet = 0
 		realPageNum = 1
