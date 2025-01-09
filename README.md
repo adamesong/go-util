@@ -17,9 +17,10 @@
 - [x] pagination
 - [x] password
 - [x] phone: phone number; twilio
+- [x] pointer
 - [x] random: generate random strings/numbers
 - [x] redis: redis; email/mobile verification
-- [ ] refresh_token
+- [x] refresh_token
 - [x] signature
 - [x] storage: s3
 - [x] struct_tool: update object values
