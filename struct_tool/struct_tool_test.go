@@ -1,7 +1,6 @@
 package struct_tool_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -33,6 +32,7 @@ func TestSetUpdateValueWithOptionCanSetZeroTrue(t *testing.T) {
 
 	now := time.Now()
 	oId := uuid.New()
+
 	newId := uuid.New()
 
 	// 创建一个TestStruct实例
@@ -64,6 +64,20 @@ func TestSetUpdateValueWithOptionCanSetZeroTrue(t *testing.T) {
 		ClubId:    &newId,
 		UpdatedAt: ptr.New(now.Add(time.Hour)),
 	}
+	orginStruct2 := TestStruct{
+		Name:      "John",
+		Age:       30,
+		Id:        uuid.New(),
+		Price:     10.5,
+		Score:     decimal.NewFromFloat(85.5),
+		CreatedAt: now,
+		Message:   ptr.New("orgin message"),
+		Amount:    ptr.New(1),
+		Weight:    ptr.New(1.1),
+		Height:    ptr.New(decimal.NewFromFloat(1.1)),
+		ClubId:    &oId,
+		UpdatedAt: &now,
+	}
 	zeroStruct := TestStruct{
 		Name:      "",
 		Age:       0,
@@ -81,16 +95,18 @@ func TestSetUpdateValueWithOptionCanSetZeroTrue(t *testing.T) {
 
 	// 创建一个Option实例
 	option := struct_tool.SetUpdateValueOption{
-		CanSetZero: true,
+		CanSetNil: true,
 	}
 
-	// 调用SetUpdateValueWithOption函数
-	changed, originMap, changeMap := struct_tool.SetUpdateValueWithOption(&orginStruct, &updateStruct, &option)
+	//! 测试1: 无nil值的情况下，所有值都应被更新
+	changed, _, _, err := struct_tool.SetUpdateValueWithOption(&orginStruct, &updateStruct, &option)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if changed == false {
 		t.Errorf("Expected changed to be true, but got %v", changed)
 	}
-	fmt.Println("originMap:", originMap)
-	fmt.Println("changeMap:", changeMap)
+
 	if orginStruct.Age != 35 {
 		t.Errorf("Expected Age to be 35, but got %d", orginStruct.Age)
 	}
@@ -135,13 +151,15 @@ func TestSetUpdateValueWithOptionCanSetZeroTrue(t *testing.T) {
 		t.Errorf("Expected UpdatedAt to be %v, but got %v", now.Add(time.Hour), *orginStruct.UpdatedAt)
 	}
 
-	// 测试更新为零值
-	changed, originMap, changeMap = struct_tool.SetUpdateValueWithOption(&orginStruct, &zeroStruct, &option)
-	if changed == false {
+	//! 测试2: 除nil值以外的零值都被更新，nil值由于设置了CanSetNil所以也将被更新
+
+	changed, _, _, err = struct_tool.SetUpdateValueWithOption(&orginStruct, &zeroStruct, &option)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !changed {
 		t.Errorf("Expected changed to be true, but got %v", changed)
 	}
-	fmt.Println("originMap:", originMap)
-	fmt.Println("changeMap:", changeMap)
 
 	if orginStruct.Age != 0 {
 		t.Errorf("Expected Age to be 0, but got %d", orginStruct.Age)
@@ -187,12 +205,176 @@ func TestSetUpdateValueWithOptionCanSetZeroTrue(t *testing.T) {
 		t.Errorf("Expected UpdatedAt to be nil, but got %v", *orginStruct.UpdatedAt)
 	}
 
+	//! 测试3: 除nil值以外的零值都被更新，nil值由于设置了CanSetNil = false 所以也将不会被更新
+
 	option2 := struct_tool.SetUpdateValueOption{
-		CanSetZero: false,
+		CanSetNil: false,
 	}
-	changed, _, _ = struct_tool.SetUpdateValueWithOption(&orginStruct, &zeroStruct, &option2)
+
+	// 去除了price和height，这两个字段相当于默认也是0值，也将被更新；其他在partialZeroStruct中的nil值将不会被更新
+	partialZeroStruct := TestStruct{
+		Name: "Jane",
+		Age:  0,
+		Id:   newId,
+
+		Score:     decimal.NewFromFloat(0),
+		CreatedAt: time.Time{},
+		Message:   nil,
+		Amount:    nil,
+		Weight:    nil,
+
+		ClubId:    nil,
+		UpdatedAt: nil,
+	}
+	changed, _, _, err = struct_tool.SetUpdateValueWithOption(&orginStruct2, &partialZeroStruct, &option2)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if changed == false {
+		t.Errorf("Expected changed to be true, but got %v", changed)
+	}
+	// 检查是否修改了Name字段的值
+	if orginStruct2.Name != "Jane" {
+		t.Errorf("Expected Name to be 'Jane', but got %s", orginStruct2.Name)
+	}
+	if orginStruct2.Id != newId {
+		t.Errorf("Expected Id to be %v, but got %v", newId, orginStruct2.Id)
+	}
+	// 检查是否修改了Price字段的值
+	if orginStruct2.Price != 0 {
+		t.Errorf("Expected Price to be 0, but got %f", orginStruct2.Price)
+	}
+	if orginStruct2.Score.String() != "0" {
+		t.Errorf("Expected Score to be 0, but got %s", orginStruct2.Score.String())
+	}
+	// 检查是否修改了CreatedAt字段的值
+	if !orginStruct2.CreatedAt.IsZero() {
+		t.Errorf("Expected CreatedAt to be %v, but got %v", time.Time{}, orginStruct2.CreatedAt)
+	}
+	if orginStruct2.Message == nil {
+		t.Errorf("Expected Message to be nil, but got %s", *orginStruct2.Message)
+	}
+
+	// 检查是否修改了Amount字段的值
+	if orginStruct2.Amount == nil {
+		t.Errorf("Expected Amount to be nil, but got %d", *orginStruct2.Amount)
+	}
+	if orginStruct2.Weight == nil {
+		t.Errorf("Expected Weight to be nil, but got %f", *orginStruct2.Weight)
+	}
+
+	// 检查是否修改了Height字段的值
+	if orginStruct2.Height == nil {
+		t.Errorf("Expected Height to be not nil, but got nil")
+	}
+	// 检查是否修改了ClubId字段的值
+	if orginStruct2.ClubId == nil {
+		t.Errorf("Expected ClubId to be nil, but got %s", orginStruct2.ClubId.String())
+	}
+	if orginStruct2.UpdatedAt == nil {
+		t.Errorf("Expected UpdatedAt to be nil, but got %v", *orginStruct2.UpdatedAt)
+	}
+
+	//! 测试4: 两个不同的结构体，同名field的类型不同，前者是值，后者是指针
+	orgin4 := struct {
+		Name string
+	}{Name: "john"}
+	update4 := struct {
+		Name *string
+	}{Name: ptr.New("update name")}
+	option4 := struct_tool.SetUpdateValueOption{
+		CanSetNil: true,
+	}
+	changed, _, _, err = struct_tool.SetUpdateValueWithOption(&orgin4, &update4, &option4)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if changed == false {
+		t.Errorf("Expected changed to be true, but got %v", changed)
+	}
+	// 检查是否修改了Name字段的值
+	if orgin4.Name != "update name" {
+		t.Errorf("Expected Name to be 'update name', but got %s", orgin4.Name)
+	}
+
+	//! 测试5: 两个不同的结构体，同名field的类型不同，前者是指针，后者是值
+	orgin5 := struct {
+		Name *string
+	}{Name: ptr.New("john")}
+	update5 := struct {
+		Name string
+	}{Name: "update name"}
+	option5 := struct_tool.SetUpdateValueOption{
+		CanSetNil: true,
+	}
+	changed, _, _, err = struct_tool.SetUpdateValueWithOption(&orgin5, &update5, &option5)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if changed == false {
+		t.Errorf("Expected changed to be true, but got %v", changed)
+	}
+	if *orgin5.Name != "update name" {
+		t.Errorf("Expected Name to be 'update name', but got %s", *orgin5.Name)
+	}
+	//! 测试6: 两个不同的结构体，同名field的类型不同，前者是指针，后者是指针
+	orgin6 := struct {
+		Name *string
+	}{Name: ptr.New("john")}
+	update6 := struct {
+		Name *string
+	}{Name: ptr.New("update name")}
+	option6 := struct_tool.SetUpdateValueOption{
+		CanSetNil: true,
+	}
+	changed, _, _, err = struct_tool.SetUpdateValueWithOption(&orgin6, &update6, &option6)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if changed == false {
+		t.Errorf("Expected changed to be true, but got %v", changed)
+	}
+	if *orgin6.Name != "update name" {
+		t.Errorf("Expected Name to be 'update name', but got %s", *orgin6.Name)
+	}
+	//! 测试7: 两个不同的结构体，同名field的类型不同，前者是值且为非零，后者是指针且为nil
+	orgin7 := struct {
+		Name string
+	}{Name: "john"}
+	zero7 := struct {
+		Name *string
+	}{Name: nil}
+	option7 := struct_tool.SetUpdateValueOption{
+		CanSetNil: true,
+	}
+	changed, _, _, err = struct_tool.SetUpdateValueWithOption(&orgin7, &zero7, &option7)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if changed == true {
-		t.Errorf("Expected changed to be false, but got %v", changed)
+		t.Errorf("Expected changed to be true, but got %v", changed)
+	}
+
+	//! 测试8: 两个不同的结构体，同名field的类型不同，前者是指针且为nil，后者是值且为零
+	orgin8 := struct {
+		Name *string
+	}{Name: nil}
+	zero8 := struct {
+		Name string
+	}{Name: ""}
+	option8 := struct_tool.SetUpdateValueOption{
+		CanSetNil: true,
+	}
+	changed, _, _, err = struct_tool.SetUpdateValueWithOption(&orgin8, &zero8, &option8)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if changed == false {
+		t.Errorf("Expected changed to be true, but got %v", changed)
+	}
+
+	if *orgin8.Name != "" {
+		t.Errorf("Expected Name to be '', but got %s", *orgin8.Name)
 	}
 
 }

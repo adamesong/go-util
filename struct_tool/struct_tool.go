@@ -1,6 +1,7 @@
 package struct_tool
 
 import (
+	"errors"
 	"reflect"
 	"strconv"
 )
@@ -54,26 +55,37 @@ func SetUpdateValue(originObjPtr, updateInfoObjPtr interface{}) (changed bool, o
 }
 
 type SetUpdateValueOption struct {
-	// 是否将零值更新到originObj中,零值也包含空指针nil
-	CanSetZero bool
+	// 是否将空指针(nil)更新到originObj中
+	CanSetNil bool
 }
 
-// SetUpdateValue2 将updateInfoObj这个结构体实例中的各项更新至originObj中各同名项中。
-// 1. originObjPtr 是 originObj的指针；updateInfoObjPtr 是 updateInfoObj的指针
-// 2. 如果 canSetZero为false, updateInfoObj的各项如果不是零值，且与originObj中的对应项值不同，才会更新至originObj；如果canSetZero为true，updateInfoObj的各项如果是零值，则将orginObj中的对应项更新为零值
-
-// changed: 表示原始值被更新
-// originMap: 如果changed == true，orginMap中列出变动前的项和原始值
-// changedMap: 如果changed == true，changedMap中列出后的项和值
-func SetUpdateValueWithOption(originObjPtr, updateInfoObjPtr interface{}, option *SetUpdateValueOption) (changed bool, originMap, changedMap map[string]interface{}) {
+// SetUpdateValueWithOption 将updateInfoObj的值更新到originObj中。
+// - originObjPtr: 原始对象的指针。
+// - updateInfoObjPtr: 更新信息的对象指针。
+// - option: 更新选项。
+// 返回值:
+// - changed: 是否有任何字段被更新。
+// - originMap: 记录被更新字段的原始值。
+// - changedMap: 记录被更新字段的更新值。
+// originObj 和 updateInfoObj 可能是两个不同的struct的instance。这两个struct的field名称可能相同，只有updateInfoObj中的field名称在originObj中存在时，才将会被更新。
+// 允许处理字段类型不一致（值与指针互转）的场景，并根据 CanSetNil 决定是否更新空指针。
+// 场景1: 例如originObj中可能有个Age int, updateInfoObj中可能有Age *int，那么如果后者不是nil，则将后者指针指向的值更新到前者。如果后者是nil，则无值，无论是否设置CanSetNil，都不会将前者设为零值。
+// 场景2: 如果originObj中Age *int， updateInfoObj中Age int，则将后者的值更新至前者。
+// 场景3: 如果orginObj中Age *int, updateInfoObj中 Age *int，则后者的Age指针根据CanSetNil的设置情况决定是否更新到originObj的Age
+// 如果CanSetNil为false，updateInfoObj中的各项目的值除了nil以外都将更新至originObj，nil以外的零值也更新；
+// 如果CanSetNil为true，updateInfoObj中的各项目的值包括nil和其他类型的零值都将更新至originObj
+// ! 所以，将此function用于go-gin bind query或bind json时，将updateInfo struct中的可能会出现零值的field用指针表示，并设置CanSetNil=false，这样能防止未提供的更新项被误更新为零值
+func SetUpdateValueWithOption(originObjPtr, updateInfoObjPtr interface{}, option *SetUpdateValueOption) (changed bool, originMap, changedMap map[string]interface{}, err error) {
 	// option不可为nil，必须有option
 	if option == nil {
-		panic("option cannot be nil")
+		// panic("option cannot be nil")
+		err = errors.New("option cannot be nil")
+		return
 	}
 
 	// 初始化返回值
-	originMap = map[string]interface{}{}
-	changedMap = map[string]interface{}{}
+	originMap = make(map[string]interface{})
+	changedMap = make(map[string]interface{})
 
 	// 获取 reflect 的类型和值
 	originValue := reflect.ValueOf(originObjPtr)
@@ -81,7 +93,9 @@ func SetUpdateValueWithOption(originObjPtr, updateInfoObjPtr interface{}, option
 
 	// 必须是指针类型
 	if originValue.Kind() != reflect.Ptr || updateValue.Kind() != reflect.Ptr {
-		panic("both originObjPtr and updateInfoObjPtr must be pointers to structs")
+		// panic("both originObjPtr and updateInfoObjPtr must be pointers to structs")
+		err = errors.New("both originObjPtr and updateInfoObjPtr must be pointers to structs")
+		return
 	}
 
 	// 获取指向的元素
@@ -90,7 +104,9 @@ func SetUpdateValueWithOption(originObjPtr, updateInfoObjPtr interface{}, option
 
 	// 确保是结构体
 	if originValue.Kind() != reflect.Struct || updateValue.Kind() != reflect.Struct {
-		panic("both originObjPtr and updateInfoObjPtr must be pointers to structs")
+		// panic("both originObjPtr and updateInfoObjPtr must be pointers to structs")
+		err = errors.New("both originObjPtr and updateInfoObjPtr must be pointers to structs")
+		return
 	}
 
 	// 遍历 updateInfoObj 的字段
@@ -103,70 +119,63 @@ func SetUpdateValueWithOption(originObjPtr, updateInfoObjPtr interface{}, option
 		updateFieldValue := updateValue.Field(i)
 		originFieldValue := originValue.FieldByName(fieldName)
 
-		// 检查 origin 中是否存在该字段, 如果orgin中不存在update的字段，跳过该字段
+		// 如果 origin 中不存在该字段，跳过
 		if !originFieldValue.IsValid() {
 			continue
 		}
 
-		// 处理指针字段和非指针字段
-		var updateValueInterface interface{}
-		if updateFieldValue.Kind() == reflect.Ptr {
-			// 指针字段，获取指针指向的值
+		// 判断类型是否一致
+		isOriginPtr := originFieldValue.Kind() == reflect.Ptr
+		isUpdatePtr := updateFieldValue.Kind() == reflect.Ptr
+
+		// 处理两边都是指针的情况
+		if isOriginPtr && isUpdatePtr {
 			if updateFieldValue.IsNil() {
-				updateValueInterface = nil
+				if option.CanSetNil {
+					originMap[fieldName] = originFieldValue.Interface()
+					changedMap[fieldName] = nil
+					originFieldValue.Set(reflect.Zero(originFieldValue.Type()))
+					changed = true
+				}
 			} else {
-				updateValueInterface = updateFieldValue.Elem().Interface()
+				originMap[fieldName] = originFieldValue.Interface()
+				changedMap[fieldName] = updateFieldValue.Interface()
+				originFieldValue.Set(updateFieldValue)
+				changed = true
 			}
-		} else {
-			// 非指针字段，直接获取值
-			updateValueInterface = updateFieldValue.Interface()
+			continue
 		}
 
-		// 判断是否更新字段
-		shouldUpdate := false
-		if option.CanSetZero {
-			// 如果允许设置零值，则直接更新字段
-			shouldUpdate = true
-		} else {
-			// 如果不允许设置零值，则需要判断是否为零值
-			if !updateFieldValue.IsZero() {
-				shouldUpdate = true
+		// 处理origin是值，update是指针
+		if !isOriginPtr && isUpdatePtr {
+			if !updateFieldValue.IsNil() {
+				updateValue := updateFieldValue.Elem().Interface()
+				originMap[fieldName] = originFieldValue.Interface()
+				changedMap[fieldName] = updateValue
+				originFieldValue.Set(reflect.ValueOf(updateValue))
+				changed = true
 			}
+			continue
 		}
 
-		// 处理 nil 的特殊情况 (字段为指针，允许设置零值的情况下，updateFieldValue是nil，则将原值也设为nil)
-		if shouldUpdate && updateFieldValue.Kind() == reflect.Ptr && updateFieldValue.IsNil() && option.CanSetZero {
-			// 如果允许设置零值，且字段为 nil，则更新
+		// 处理origin是指针，update是值
+		if isOriginPtr && !isUpdatePtr {
+			updateValue := updateFieldValue.Interface()
 			originMap[fieldName] = originFieldValue.Interface()
-			changedMap[fieldName] = nil
-			originFieldValue.Set(reflect.Zero(originFieldValue.Type())) // 将字段设置为 nil
+			changedMap[fieldName] = updateValue
+			newValue := reflect.New(originFieldValue.Type().Elem())
+			newValue.Elem().Set(reflect.ValueOf(updateValue))
+			originFieldValue.Set(newValue)
 			changed = true
 			continue
 		}
 
-		// 如果字段需要更新，并且值与原始值不同
-		if shouldUpdate && !reflect.DeepEqual(originFieldValue.Interface(), updateValueInterface) {
-			// 记录变更前的值
+		// 处理两边都是值的情况
+		updateValue := updateFieldValue.Interface()
+		if !reflect.DeepEqual(originFieldValue.Interface(), updateValue) {
 			originMap[fieldName] = originFieldValue.Interface()
-			// 记录变更后的值
-			changedMap[fieldName] = updateValueInterface
-
-			// 更新字段值
-			if originFieldValue.Kind() == reflect.Ptr {
-				// 更新指针字段
-				if updateValueInterface == nil {
-					originFieldValue.Set(reflect.Zero(originFieldValue.Type()))
-				} else {
-					newValue := reflect.New(originFieldValue.Type().Elem())
-					newValue.Elem().Set(reflect.ValueOf(updateValueInterface))
-					originFieldValue.Set(newValue)
-				}
-			} else {
-				// 更新非指针字段
-				originFieldValue.Set(reflect.ValueOf(updateValueInterface))
-			}
-
-			// 标记有变更
+			changedMap[fieldName] = updateValue
+			originFieldValue.Set(reflect.ValueOf(updateValue))
 			changed = true
 		}
 	}
