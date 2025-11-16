@@ -13,6 +13,8 @@ import (
 	"github.com/adamesong/go-util/logging"
 	"github.com/adamesong/go-util/random"
 
+	// ! aws-sdk-go deprecated, use aws-sdk-go-v2 instead
+	// todo 将此包替换为 aws-sdk-go-v2
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -300,36 +302,37 @@ func (s3 *S3) GetS3URLFromCDNURL(cdnURL string) (s3URL string) {
 // continuationToken：当*result.IsTruncated==true时，会有个nextContinuationToken，用这个来取后面的objects
 // https://docs.aws.amazon.com/sdk-for-go/api/service/s3/#S3.ListObjectsV2
 // 返回值：result
-//   Contents: [
-//     {
-//      ETag: "\"787d14e0d82d995e3615e0900575f951\"",
-//      Key: "assets/slider/4.JPG",
-//      LastModified: 2019-07-19 21:52:13 +0000 UTC,
-//      Size: 90043,
-//      StorageClass: "STANDARD"
-//    },
-//    {
-//      ETag: "\"7506c19233ddd9a02e29465fc070f0ef\"",
-//      Key: "assets/slider/5.JPG",
-//      LastModified: 2019-07-19 21:52:13 +0000 UTC,
-//      Size: 108746,
-//      StorageClass: "STANDARD"
-//    },
-//    {
-//      ETag: "\"d41d8cd98f00b204e9800998ecf8427e\"",
-//      Key: "baby/",
-//      LastModified: 2019-06-12 17:41:06 +0000 UTC,
-//      Size: 0,
-//      StorageClass: "STANDARD"
-//    }
-//  ]
-//  IsTruncated: true,  // 是否被截断了
-//  KeyCount: 6,
-//  MaxKeys: 6,
-//  Name: "classtop-com-test",
-//  NextContinuationToken: "16MrB83O08WqafJ8HqilMdg/iSUSLSJMwZ6on7UtsYC0YWg4lBZHFLQ==",
-//  Prefix: "",
-//  StartAfter: "assets/"
+//
+//	 Contents: [
+//	   {
+//	    ETag: "\"787d14e0d82d995e3615e0900575f951\"",
+//	    Key: "assets/slider/4.JPG",
+//	    LastModified: 2019-07-19 21:52:13 +0000 UTC,
+//	    Size: 90043,
+//	    StorageClass: "STANDARD"
+//	  },
+//	  {
+//	    ETag: "\"7506c19233ddd9a02e29465fc070f0ef\"",
+//	    Key: "assets/slider/5.JPG",
+//	    LastModified: 2019-07-19 21:52:13 +0000 UTC,
+//	    Size: 108746,
+//	    StorageClass: "STANDARD"
+//	  },
+//	  {
+//	    ETag: "\"d41d8cd98f00b204e9800998ecf8427e\"",
+//	    Key: "baby/",
+//	    LastModified: 2019-06-12 17:41:06 +0000 UTC,
+//	    Size: 0,
+//	    StorageClass: "STANDARD"
+//	  }
+//	]
+//	IsTruncated: true,  // 是否被截断了
+//	KeyCount: 6,
+//	MaxKeys: 6,
+//	Name: "classtop-com-test",
+//	NextContinuationToken: "16MrB83O08WqafJ8HqilMdg/iSUSLSJMwZ6on7UtsYC0YWg4lBZHFLQ==",
+//	Prefix: "",
+//	StartAfter: "assets/"
 func (s *S3) ListObjectsFromS3(bucketName, prefix, startAfter, continuationToken string) (result *s3.ListObjectsV2Output) {
 	svc := s3.New(s.getSession())
 	var input *s3.ListObjectsV2Input

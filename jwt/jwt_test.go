@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/adamesong/go-util/random"
-	"github.com/dgrijalva/jwt-go"
+	// "github.com/dgrijalva/jwt-go"
+	// "github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,11 +16,11 @@ import (
 func TestToken(t *testing.T) {
 	claim := CustomClaims{
 		UserID: uuid.NewString(),
-		StandardClaims: jwt.StandardClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    random.RandomString(5),
 			Subject:   random.RandomString(5),
-			IssuedAt:  time.Now().Unix(),
-			ExpiresAt: time.Now().Add(time.Minute * 5).Unix(),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 5)),
 		},
 	}
 	jwtSecret := random.RandomString(12)

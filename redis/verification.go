@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/adamesong/go-util/random"
+	"github.com/google/uuid"
 )
 
 const (
@@ -69,6 +70,16 @@ func (v *Verification) SetEmailVerifyCode(email string) (string, error) {
 	code := random.RandomNumber(v.EmailCodeLength)
 	err := v.Redis.Set(GetEmailCacheKey(email), code, v.EmailCodeTimeout)
 	return code, err
+}
+
+// SetEmailVeirifyCodeUUID 在缓存中保存Email验证码，只是code是uuid。
+func (v *Verification) SetEmailVerifyCodeUUID(email string) (string, error) {
+	code, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	err = v.Redis.Set(GetEmailCacheKey(email), code, v.EmailCodeTimeout)
+	return code.String(), err
 }
 
 func (v *Verification) GetSetEmailVerifyCode(email string) (code string, err error) {
