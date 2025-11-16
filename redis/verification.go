@@ -5,6 +5,7 @@ import (
 
 	"github.com/adamesong/go-util/random"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -109,17 +110,27 @@ func (v *Verification) SetMobileVerifyCode(mobile string) (string, error) {
 	return code, err
 }
 
-// 验证缓存中的验证码（email或者mobile)
+// 验证缓存中的验证码（email或者mobile).
+// 验证成功后，会删除该key
 func (v *Verification) VerifyCode(key, code string) (bool, error) {
-	if value, err := v.Redis.Get(key); err != nil {
-		return false, err
-	} else {
-		if string(value) == code {
-			return true, err
-		} else {
-			return false, err
+	value, err := v.Redis.Get(key)
+	if err != nil {
+		if err == redis.Nil {
+			// key不存在，验证失败
+			return false, nil
 		}
+		// 其他redis错误
+		return false, err
 	}
+
+	if string(value) == code {
+		// 验证成功，删除该key
+		_, err = v.Redis.Delete(key)
+		return true, err
+	}
+
+	// 验证码不匹配
+	return false, nil
 }
 
 // 验证手机验证码

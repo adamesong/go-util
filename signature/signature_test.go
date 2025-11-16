@@ -1,7 +1,6 @@
 package signature_test
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/adamesong/go-util/redis"
 	"github.com/adamesong/go-util/signature"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetStrToSign(t *testing.T) {
@@ -47,26 +47,32 @@ func TestGetStrToSign(t *testing.T) {
 }
 
 func TestVerifySign(t *testing.T) {
+	// Correctly initialize the redis client using the new constructor
+	redisClient, err := redis.NewRedisClient("localhost:6379", "", 0)
+	require.NoError(t, err, "Failed to initialize redis client for test")
+	defer redisClient.Close()
 
-	redisClient := redis.RedisClient{Addr: "localhost:6379", Password: "", DB: 0}
 	AppKeyAndSecret := map[string]string{
 		"testAppKey-abcde1234": "testAppSecret-67890fghijk",
 	}
 	urlPath := "/v1/my_expert/"
 
 	cases := []struct {
+		name        string
 		reqMethod   string
 		reqForm     url.Values
 		reqBodyJson []byte
 		uniqueSign  bool
 	}{
 		{
+			name:        "Non-unique sign",
 			reqMethod:   http.MethodGet,
 			reqForm:     url.Values{},
 			reqBodyJson: []byte{},
 			uniqueSign:  false,
 		},
 		{
+			name:        "Unique sign",
 			reqMethod:   http.MethodPost,
 			reqForm:     url.Values{},
 			reqBodyJson: []byte{},
@@ -76,45 +82,45 @@ func TestVerifySign(t *testing.T) {
 
 	doAssertion := assert.New(t)
 
-	for n, tc := range cases {
-		fmt.Println("Test case: ", n)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Prepare the SignOption instance
+			sOption := signature.SignOption{
+				AppKeyAndSecret: AppKeyAndSecret,
+				UniqueSign:      tc.uniqueSign,
+			}
 
-		// Prepare the SignOption instance
-		sOption := signature.SignOption{
-			AppKeyAndSecret: AppKeyAndSecret,
-			UniqueSign:      tc.uniqueSign,
-		}
+			// signBody
+			sBody := signature.SignBody{
+				UrlPath:       urlPath,
+				RequestMethod: tc.reqMethod,
+				ReqForm:       tc.reqForm,
+				ReqBodyJson:   tc.reqBodyJson,
+			}
 
-		// signBody
-		sBody := signature.SignBody{
-			UrlPath:       urlPath,
-			RequestMethod: tc.reqMethod,
-			ReqForm:       tc.reqForm,
-			ReqBodyJson:   tc.reqBodyJson,
-		}
+			// get test sign
+			_, _, signedForm := sOption.GetTestSign(&sBody, "testAppKey-abcde1234")
 
-		// get test sign
-		_, _, signedForm := sOption.GetTestSign(&sBody, "testAppKey-abcde1234")
+			// Prepare the SignVerifyOption instance
+			vOption := signature.SignVerifyOption{
+				AppKeyAndSecret: AppKeyAndSecret,
+				UniqueSign:      tc.uniqueSign,
+				RedisClient:     redisClient, // Correctly pass the redis client pointer
+			}
 
-		// Prepare the SignVerifyOption instance
-		vOption := signature.SignVerifyOption{
-			AppKeyAndSecret: AppKeyAndSecret,
-			UniqueSign:      tc.uniqueSign,
-			RedisClient:     &redisClient,
-		}
+			// signBody in signVerify
+			vBody := signature.SignBody{
+				UrlPath:       urlPath,
+				RequestMethod: tc.reqMethod,
+				ReqForm:       signedForm,
+				ReqBodyJson:   tc.reqBodyJson,
+			}
 
-		// signBody in signVerify
-		vBody := signature.SignBody{
-			UrlPath:       urlPath,
-			RequestMethod: tc.reqMethod,
-			ReqForm:       signedForm,
-			ReqBodyJson:   tc.reqBodyJson,
-		}
+			// VerifySign
+			result, errCode := vOption.VerifySign(&vBody)
 
-		// VerifySign
-		result, errCode := vOption.VerifySign(&vBody)
-
-		fmt.Println(errCode)
-		doAssertion.True(result)
+			doAssertion.True(result, "Expected verification to succeed, but it failed with code: %s", errCode)
+			doAssertion.Empty(errCode, "Expected no error code on success")
+		})
 	}
 }

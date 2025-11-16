@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
 
 	"net/url"
 	"reflect"
@@ -246,7 +245,7 @@ func GetStrToSign(urlPath, reqMethod string, reqForm url.Values, reqBody []byte,
 		// base64(md5(json_body)) 然后拼接至strToSign
 		// md5
 		md5JsonBody := md5.New()
-		_, _ = io.WriteString(md5JsonBody, string(reqBody))
+		_, _ = md5JsonBody.Write(reqBody)
 		md5JsonBodyStr := fmt.Sprintf("%x", md5JsonBody.Sum(nil))
 		// base64加密之后，拼接至 strToSign
 		strToSign = strToSign + "\n" + base64.StdEncoding.EncodeToString([]byte(md5JsonBodyStr))
@@ -472,7 +471,7 @@ func (option *SignOption) GetStrToSign(body *SignBody) (strToSign string, errCod
 		// base64(md5(json_body)) 然后拼接至strToSign
 		// md5
 		md5JsonBody := md5.New()
-		_, _ = io.WriteString(md5JsonBody, string(body.ReqBodyJson))
+		_, _ = md5JsonBody.Write(body.ReqBodyJson)
 		md5JsonBodyStr := fmt.Sprintf("%x", md5JsonBody.Sum(nil))
 		// base64加密之后，拼接至 strToSign
 		strToSign = strToSign + "\n" + base64.StdEncoding.EncodeToString([]byte(md5JsonBodyStr))

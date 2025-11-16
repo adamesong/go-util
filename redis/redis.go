@@ -5,206 +5,156 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adamesong/go-util/color"
-	"github.com/adamesong/go-util/logging"
-
 	"github.com/redis/go-redis/v9"
-	// "github.com/go-redis/redis"
 )
 
-// go-redis的使用：https://www.jianshu.com/p/4045a3721b3c https://segmentfault.com/a/1190000007078961
-// redis 用法详解：https://www.jianshu.com/p/2639549bedc8
+// go-redis v9 usage: https://redis.io/docs/clients/go/
 
+// RedisClient is a wrapper for the go-redis client.
+// It holds a long-lived client that manages a connection pool.
 type RedisClient struct {
-	Addr     string // 例如: xxxxx.a2fdoa.0001.usw2.cache.amazonaws.com:6379
-	Password string
-	DB       int // 例如：0
+	Client *redis.Client
 }
 
 var ctx = context.Background()
 
-func (r *RedisClient) Connect() *redis.Client {
+// NewRedisClient creates a new RedisClient.
+// It establishes a connection and pings the server to ensure it's alive.
+func NewRedisClient(addr string, password string, db int) (*RedisClient, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     r.Addr,
-		Password: r.Password,
-		DB:       r.DB,
+		Addr:     addr,
+		Password: password,
+		DB:       db,
 	})
 
-	//pong, err := client.Ping().Result()
-	_, err := client.Ping(ctx).Result()
-	if err != nil {
-		fmt.Println(color.Red("Redis连接测试失败！！！"))
-		fmt.Println(err.Error())
-		logging.Error(err.Error())
-		//panic("Redis连接失败！！")
+	// Test the connection
+	if _, err := client.Ping(ctx).Result(); err != nil {
+		return nil, fmt.Errorf("redis connection test failed: %w", err)
 	}
-	//else {
-	//	fmt.Printf(color.Blue("Redis连接测试成功！ %s\n"), pong)
-	//}
-	return client
+
+	return &RedisClient{Client: client}, nil
 }
 
-func closeConnect(client *redis.Client) {
-	if err := client.Close(); err != nil {
-		fmt.Println(color.Red("redis client 关闭失败"))
-		logging.Error("redis client 关闭失败")
-	}
-	//else {
-	//	fmt.Println(color.Blue("redis client 关闭成功"))
-	//}
+// Close closes the underlying redis client and release resources.
+func (r *RedisClient) Close() error {
+	return r.Client.Close()
 }
 
-// Keys 用于查找所有符合给定模式 pattern 的 key
-func (r *RedisClient) Keys(pattern string) (keys []string, err error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.Keys(ctx, pattern).Result()
+// Keys finds all keys matching the given pattern.
+// Warning: KEYS can be slow on a large database.
+func (r *RedisClient) Keys(pattern string) ([]string, error) {
+	return r.Client.Keys(ctx, pattern).Result()
 }
 
-// Set 设置key value，如果duration为0，则意味着无有效期，永远存在
+// Set sets a key-value pair. A duration of 0 means no expiration.
 func (r *RedisClient) Set(key string, value interface{}, duration time.Duration) error {
-	client := r.Connect()
-	defer closeConnect(client)
-	err := client.Set(ctx, key, value, duration).Err()
-	return err
+	return r.Client.Set(ctx, key, value, duration).Err()
 }
 
-// Get 返回[]byte，如果不存在，则error为 redis: nil
+// Get retrieves a value by key. Returns redis.Nil error if key does not exist.
 func (r *RedisClient) Get(key string) ([]byte, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.Get(ctx, key).Bytes()
+	return r.Client.Get(ctx, key).Bytes()
 }
 
+// MGet retrieves multiple values by keys.
 func (r *RedisClient) MGet(keys ...string) ([]interface{}, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.MGet(ctx, keys...).Result()
+	return r.Client.MGet(ctx, keys...).Result()
 }
 
-// SetNX 只有key不存在时，当前set操作才执行
+// SetNX sets a key-value pair only if the key does not exist.
 func (r *RedisClient) SetNX(key string, value interface{}, duration time.Duration) (bool, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.SetNX(ctx, key, value, duration).Result()
+	return r.Client.SetNX(ctx, key, value, duration).Result()
 }
 
-// SetXX 只有key存在时，当前set操作才执行
+// SetXX sets a key-value pair only if the key already exists.
 func (r *RedisClient) SetXX(key string, value interface{}, duration time.Duration) (bool, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.SetXX(ctx, key, value, duration).Result()
+	return r.Client.SetXX(ctx, key, value, duration).Result()
 }
 
-// Exists 检查某一个或多个key是否存在，如不存在，返回的数字是0
+// Exists checks if one or more keys exist.
 func (r *RedisClient) Exists(key ...string) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.Exists(ctx, key...).Result()
+	return r.Client.Exists(ctx, key...).Result()
 }
 
-// GetSet 设置新值并获取原来的值，不改变duration。注意，如果没有原来的值，则duration会是永久的
-// 获取：GetSet（原子性），设置新值，返回旧值。比如一个按小时计算的计数器，可以用GetSet获取计数并重置为0。
+// GetSet sets a new value for a key and returns the old value.
 func (r *RedisClient) GetSet(key string, value interface{}) ([]byte, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.GetSet(ctx, key, value).Bytes()
+	return r.Client.GetSet(ctx, key, value).Bytes()
 }
 
-// Delete 返回删除的key的数量
+// Delete deletes one or more keys. Returns the number of keys that were removed.
 func (r *RedisClient) Delete(keys ...string) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.Del(ctx, keys...).Result()
+	return r.Client.Del(ctx, keys...).Result()
 }
 
-// TTL 返回 以毫秒为单位的整数值TTL或负值
-// -1ns, 如果key没有到期超时（没有设置有效期）。-2ns, 如果键不存在(或者键已经过期了)。
+// TTL returns the remaining time to live of a key.
 func (r *RedisClient) TTL(key string) (time.Duration, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.TTL(ctx, key).Result()
+	return r.Client.TTL(ctx, key).Result()
 }
 
-// 重设timeout时间
-// 如果key不存在，则返回false；如果原来没有有效期，现在会有有效期
+// Expire sets a new expiration for a key.
 func (r *RedisClient) Expire(key string, duration time.Duration) (bool, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.Expire(ctx, key, duration).Result()
+	return r.Client.Expire(ctx, key, duration).Result()
 }
 
+// LikeDeletes deletes keys matching a pattern. Warning: KEYS can be slow in production.
 func (r *RedisClient) LikeDeletes(key string) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	keys, err := client.Keys(ctx, "*"+key+"*").Result()
+	keys, err := r.Client.Keys(ctx, "*"+key+"*").Result()
 	if err != nil {
-		return int64(0), err
+		return 0, err
 	}
-	num, err := r.Delete(keys...)
-	return num, err
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	return r.Delete(keys...)
 }
 
-// 一次放入多个value进一个list的尾部
+// RPush appends one or more values to a list.
 func (r *RedisClient) RPush(key string, values ...interface{}) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.RPush(ctx, key, values...).Result()
+	return r.Client.RPush(ctx, key, values...).Result()
 }
 
-// 一次放入1个value的尾部
+// RPushX appends a value to a list, only if the list exists.
 func (r *RedisClient) RPushX(key string, value interface{}) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.RPushX(ctx, key, value).Result()
+	return r.Client.RPushX(ctx, key, value).Result()
 }
 
-type Z = redis.Z // 类型别名
+// Z is a type alias for redis.Z, representing a member in a sorted set.
+type Z = redis.Z
 
+// ZAdd adds one or more members to a sorted set.
 func (r *RedisClient) ZAdd(key string, members ...Z) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.ZAdd(ctx, key, members...).Result()
+	return r.Client.ZAdd(ctx, key, members...).Result()
 }
 
-// 注：第一个的index是0
+// ZRange returns a range of members from a sorted set, by index.
 func (r *RedisClient) ZRange(key string, start, stop int64) ([]string, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.ZRange(ctx, key, start, stop).Result()
+	return r.Client.ZRange(ctx, key, start, stop).Result()
 }
 
+// ZRevRange returns a range of members from a sorted set, by index, in reverse order.
 func (r *RedisClient) ZRevRange(key string, start, stop int64) ([]string, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.ZRevRange(ctx, key, start, stop).Result()
+	return r.Client.ZRevRange(ctx, key, start, stop).Result()
 }
 
+// HMSet sets multiple hash fields to multiple values.
 func (r *RedisClient) HMSet(key string, fields map[string]interface{}) (bool, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.HMSet(ctx, key, fields).Result()
+	// Note: HMSet is deprecated in Redis 4.0.0. Consider using HSet with multiple field-value pairs.
+	return r.Client.HMSet(ctx, key, fields).Result()
 }
 
+// MSet sets multiple key-value pairs.
 func (r *RedisClient) MSet(pairs ...interface{}) (string, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.MSet(ctx, pairs...).Result()
+	return r.Client.MSet(ctx, pairs...).Result()
 }
 
+// MSetNX sets multiple key-value pairs, only if none of the keys exist.
 func (r *RedisClient) MSetNX(pairs ...interface{}) (bool, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.MSetNX(ctx, pairs...).Result()
+	return r.Client.MSetNX(ctx, pairs...).Result()
 }
 
-// 自定义的方法，通过pipeline实现批量给key设置过期时间
-// https://www.jianshu.com/p/4045a3721b3c
-// http://vearne.cc/archives/1113
+// MExpire sets an expiration for multiple keys using a pipeline.
 func (r *RedisClient) MExpire(keys []string, duration time.Duration) error {
-	client := r.Connect()
-	defer closeConnect(client)
-	pl := client.Pipeline()
+	pl := r.Client.Pipeline()
 	for _, key := range keys {
 		pl.Expire(ctx, key, duration)
 	}
@@ -212,50 +162,43 @@ func (r *RedisClient) MExpire(keys []string, duration time.Duration) error {
 	return err
 }
 
-// HyperLogLog
-// http://remcarpediem.net/2019/06/16/用户日活月活怎么统计-Redis-HyperLogLog-详解/
+// PFAdd adds elements to a HyperLogLog.
 func (r *RedisClient) PFAdd(key string, els ...interface{}) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.PFAdd(ctx, key, els...).Result()
+	return r.Client.PFAdd(ctx, key, els...).Result()
 }
 
-// 会将每个key的value merge去重后统计数量
+// PFCount returns the approximate cardinality of the set observed by the HyperLogLog.
 func (r *RedisClient) PFCount(keys ...string) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.PFCount(ctx, keys...).Result()
+	return r.Client.PFCount(ctx, keys...).Result()
 }
 
-// 自定义的方法，通过pipeline实现批量PFCount
-// 返回值{"key1": 4, "key2": 18, ...}
-func (r *RedisClient) MPFCount(keys []string) (resultMap map[string]int64, err error) {
-	resultMap = make(map[string]int64)
-	client := r.Connect()
-	defer closeConnect(client)
-	pl := client.Pipeline()
-	for _, key := range keys {
-		pl.PFCount(ctx, key)
+// MPFCount counts the cardinality of multiple HyperLogLogs using a pipeline.
+func (r *RedisClient) MPFCount(keys []string) (map[string]int64, error) {
+	resultMap := make(map[string]int64)
+	pl := r.Client.Pipeline()
+	cmds := make([]*redis.IntCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pl.PFCount(ctx, key)
 	}
-	results, err := pl.Exec(ctx) // results类型是[]redis.Cmder
+	_, err := pl.Exec(ctx)
+	// redis.Nil is not an error from Exec, so no need to check for it here.
 	if err != nil {
-		return
+		return nil, err
 	}
-	for _, result := range results {
-		n, err := result.(*redis.IntCmd).Result() // n 就是这个key的PFCount的结果
+
+	for i, cmd := range cmds {
+		n, err := cmd.Result()
 		if err != nil {
-			logging.Error(err.Error())
-		} else {
-			key := result.Args()[1].(string) // 这是key。result.Args() == [pfcount, key]
-			resultMap[key] = n
+			// A single command can fail. The original code logged and continued.
+			// We will do the same by skipping the failed command.
+			continue
 		}
+		resultMap[keys[i]] = n
 	}
-	return
+	return resultMap, nil
 }
 
-// 如果key不存在，将key设为"1"；如果key存在，key增加1
+// Incr increments the integer value of a key by one.
 func (r *RedisClient) Incr(key string) (int64, error) {
-	client := r.Connect()
-	defer closeConnect(client)
-	return client.Incr(ctx, key).Result()
+	return r.Client.Incr(ctx, key).Result()
 }

@@ -5,86 +5,134 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var v = Verification{
-	Redis:             &r,
-	EmailCodeLength:   6,
-	EmailCodeTimeout:  time.Hour * 1,
-	MobileCodeLength:  6,
-	MobileCodeTimeout: time.Minute * 5,
+// getTestVerification creates a new Verification instance for testing.
+// It relies on the global 'r' client initialized in redis_test.go.
+func getTestVerification() *Verification {
+	return &Verification{
+		Redis:             r,
+		EmailCodeLength:   6,
+		EmailCodeTimeout:  time.Hour * 1,
+		MobileCodeLength:  6,
+		MobileCodeTimeout: time.Minute * 5,
+	}
 }
 
 func TestGetSetUserEmailVerifyCode(t *testing.T) {
+	v := getTestVerification()
 	doAssertion := assert.New(t)
 	userID := "1"
 	email := "xxx@gmail.com"
-
-	// 先确保redis中没有此cache key
 	key := GetUserEmailCacheKey(userID, email)
-	_, _ = r.Delete(key)
 
-	// 第一次设置
-	code, _ := v.GetSetUserEmailVerifyCode(userID, email)
-	if d, ttlErr := r.TTL(key); ttlErr != nil {
-		t.Error(ttlErr.Error())
-	} else {
-		fmt.Println("first duration: ", d.String())
-	}
+	// Teardown: ensure key is deleted after test
+	defer r.Delete(key)
+	// Setup: ensure key does not exist before test
+	r.Delete(key)
 
-	// 5秒后第二次设置
+	// First time setting the code
+	code, err := v.GetSetUserEmailVerifyCode(userID, email)
+	require.NoError(t, err)
+	require.NotEmpty(t, code)
+
+	d, err := r.TTL(key)
+	require.NoError(t, err)
+	fmt.Println("first duration: ", d.String())
+
+	// 5 seconds later, set it again
 	time.Sleep(time.Second * 5)
 
-	codeSecond, _ := v.GetSetUserEmailVerifyCode(userID, email)
-	if d2, ttl2Err := r.TTL(key); ttl2Err != nil {
-		t.Error(ttl2Err.Error())
-	} else {
-		// 由于重新设置，d应该是1小时，而不会是1小时-5秒，所以d应该大于1小时减5秒
-		doAssertion.Greater(d2.Seconds(), time.Duration(time.Hour-time.Second*5).Seconds())
-		fmt.Println("second duration: ", d2.String())
-	}
+	codeSecond, err := v.GetSetUserEmailVerifyCode(userID, email)
+	require.NoError(t, err)
 
-	// 两次获得的code应该相同
+	d2, err := r.TTL(key)
+	require.NoError(t, err)
+
+	// Because it was reset, the new TTL should be greater than the original TTL minus 5 seconds.
+	doAssertion.Greater(d2.Seconds(), (time.Hour - time.Second*5).Seconds())
+	fmt.Println("second duration: ", d2.String())
+
+	// The two codes should be identical
 	fmt.Println("code1: ", code, " code2: ", codeSecond)
 	doAssertion.Equal(code, codeSecond)
-
-	// tear down
-	_, _ = r.Delete(key)
 }
 
 func TestGetSetEmailVerifyCode(t *testing.T) {
+	v := getTestVerification()
 	doAssertion := assert.New(t)
 	email := "xxx@gmail.com"
-
-	// 先确保redis中没有此cache key
 	key := GetEmailCacheKey(email)
-	_, _ = r.Delete(key)
 
-	// 第一次设置
-	code, _ := v.GetSetEmailVerifyCode(email)
-	if d, ttlErr := r.TTL(key); ttlErr != nil {
-		t.Error(ttlErr.Error())
-	} else {
-		fmt.Println("first duration: ", d.String())
-	}
+	// Teardown: ensure key is deleted after test
+	defer r.Delete(key)
+	// Setup: ensure key does not exist before test
+	r.Delete(key)
 
-	// 5秒后第二次设置
+	// First time setting the code
+	code, err := v.GetSetEmailVerifyCode(email)
+	require.NoError(t, err)
+	require.NotEmpty(t, code)
+
+	d, err := r.TTL(key)
+	require.NoError(t, err)
+	fmt.Println("first duration: ", d.String())
+
+	// 5 seconds later, set it again
 	time.Sleep(time.Second * 5)
 
-	codeSecond, _ := v.GetSetEmailVerifyCode(email)
-	if d2, ttl2Err := r.TTL(key); ttl2Err != nil {
-		t.Error(ttl2Err.Error())
-	} else {
-		// 由于重新设置，d应该是1小时，而不会是1小时-5秒，所以d应该大于1小时减5秒
-		doAssertion.Greater(d2.Seconds(), time.Duration(time.Hour-time.Second*5).Seconds())
-		fmt.Println("second duration: ", d2.String())
-	}
+	codeSecond, err := v.GetSetEmailVerifyCode(email)
+	require.NoError(t, err)
 
-	// 两次获得的code应该相同
+	d2, err := r.TTL(key)
+	require.NoError(t, err)
+
+	// Because it was reset, the new TTL should be greater than the original TTL minus 5 seconds.
+	doAssertion.Greater(d2.Seconds(), (time.Hour - time.Second*5).Seconds())
+	fmt.Println("second duration: ", d2.String())
+
+	// The two codes should be identical
 	fmt.Println("code1: ", code, " code2: ", codeSecond)
 	doAssertion.Equal(code, codeSecond)
+}
 
-	// tear down
-	_, _ = r.Delete(key)
+func TestVerifyCode(t *testing.T) {
+	v := getTestVerification()
+	doAssertion := assert.New(t)
+	key := "test:verifycode"
+	code := "123456"
+
+	// Teardown
+	defer r.Delete(key)
+	// Setup
+	r.Delete(key)
+
+	// 1. Set the code
+	err := r.Set(key, code, 5*time.Second)
+	require.NoError(t, err)
+
+	// 2. Verify with correct code, should succeed
+	ok, err := v.VerifyCode(key, code)
+	doAssertion.NoError(err)
+	doAssertion.True(ok, "verification with correct code should succeed")
+
+	// 3. Check if the key was deleted
+	_, err = r.Get(key)
+	doAssertion.Equal(redis.Nil, err, "key should be deleted after successful verification")
+
+	// 4. Set it again for another test case
+	err = r.Set(key, code, 5*time.Second)
+	require.NoError(t, err)
+
+	// 5. Verify with incorrect code, should fail
+	ok, err = v.VerifyCode(key, "654321")
+	doAssertion.NoError(err)
+	doAssertion.False(ok, "verification with incorrect code should fail")
+
+	// 6. Check that the key was NOT deleted
+	_, err = r.Get(key)
+	doAssertion.NoError(err, "key should not be deleted after failed verification")
 }
