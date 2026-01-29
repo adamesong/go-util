@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	MOBILE_VERI_PREFIX = "verify_mobile:"
-	EMAIL_VERI_PREFIX  = "verify_email:"
+	MOBILE_VERI_PREFIX        = "verify_mobile:"
+	EMAIL_VERI_PREFIX         = "verify_email:"
+	REGISTRATION_TOKEN_PREFIX = "reg_token:" // 专门用于注册令牌的前缀
 )
 
 // GetUserEmailCacheKey 生成userId+email验证码的cache的key，需要userID
@@ -26,6 +27,11 @@ func GetEmailCacheKey(email string) string {
 // GetMobileCacheKey 生成mobile验证码的cache的key
 func GetMobileCacheKey(mobile string) string {
 	return MOBILE_VERI_PREFIX + mobile
+}
+
+// GetRegistrationTokenCacheKey 生成注册令牌的 key
+func GetRegistrationTokenCacheKey(email string) string {
+	return REGISTRATION_TOKEN_PREFIX + ":" + email
 }
 
 // verification struct
@@ -79,8 +85,24 @@ func (v *Verification) SetEmailVerifyCodeUUID(email string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = v.Redis.Set(GetEmailCacheKey(email), code, v.EmailCodeTimeout)
-	return code.String(), err
+	codeStr := code.String()
+	err = v.Redis.Set(GetEmailCacheKey(email), codeStr, v.EmailCodeTimeout)
+	return codeStr, err
+}
+
+// SetRegistrationToken 生成并存储注册令牌 (UUID)
+// 使用场景是：注册时，发送验证码给用户，用户输入验证码后，调用此方法，传入用户的email，获取注册令牌，存储到redis中，然后将注册令牌和验证码发送给用户。
+// 用于用户进入下一步注册流程时，拿着注册令牌和验证码，可以直接进行注册。
+func (v *Verification) SetRegistrationToken(email string) (string, error) {
+	code, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	tokenStr := code.String()
+
+	// 使用 GetRegistrationTokenCacheKey
+	err = v.Redis.Set(GetRegistrationTokenCacheKey(email), tokenStr, v.EmailCodeTimeout)
+	return tokenStr, err
 }
 
 func (v *Verification) GetSetEmailVerifyCode(email string) (code string, err error) {
@@ -149,4 +171,10 @@ func (v *Verification) VerifyUserEmail(userID string, email, code string) (bool,
 func (v *Verification) VerifyEmail(email, code string) (bool, error) {
 	key := GetEmailCacheKey(email)
 	return v.VerifyCode(key, code)
+}
+
+// VerifyRegistrationToken 专门验证注册令牌
+func (v *Verification) VerifyRegistrationToken(email, token string) (bool, error) {
+	key := GetRegistrationTokenCacheKey(email)
+	return v.VerifyCode(key, token)
 }

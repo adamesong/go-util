@@ -61,7 +61,7 @@ func TestDelete(t *testing.T) {
 	keys := []string{"test:del:1", "test:del:2"}
 
 	// Ensure keys are not present
-	r.Delete(keys...)
+	_, _ = r.Delete(keys...)
 
 	// Set keys
 	for _, k := range keys {
@@ -89,7 +89,7 @@ func TestSetNXAndSetXX(t *testing.T) {
 	key := "test:nx-xx"
 
 	// Ensure key is not present
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// SetNX on non-existent key should succeed
 	ok, err := r.SetNX(key, "val1", 10*time.Second)
@@ -112,7 +112,7 @@ func TestSetNXAndSetXX(t *testing.T) {
 	assert.Equal(t, "val3", string(val))
 
 	// Cleanup
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// SetXX on non-existent key should fail
 	ok, err = r.SetXX(key, "val4", 10*time.Second)
@@ -124,7 +124,7 @@ func TestGetSet(t *testing.T) {
 	key := "test:getset"
 
 	// Ensure key is not present
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// GetSet on non-existent key should return redis.Nil error
 	oldVal, err := r.GetSet(key, "new-val")
@@ -147,7 +147,7 @@ func TestGetSet(t *testing.T) {
 	assert.Equal(t, "final-val", string(currentVal))
 
 	// Cleanup
-	r.Delete(key)
+	_, _ = r.Delete(key)
 }
 
 func TestTTLAndExpire(t *testing.T) {
@@ -156,7 +156,7 @@ func TestTTLAndExpire(t *testing.T) {
 	keyNotExist := "test:ttl:notexist"
 
 	// Cleanup before test
-	r.Delete(keyNoExpire, keyExpire, keyNotExist)
+	_, _ = r.Delete(keyNoExpire, keyExpire, keyNotExist)
 
 	// Key with no expiration
 	require.NoError(t, r.Set(keyNoExpire, "val", 0))
@@ -189,7 +189,7 @@ func TestTTLAndExpire(t *testing.T) {
 	assert.False(t, ok)
 
 	// Cleanup
-	r.Delete(keyNoExpire, keyExpire)
+	_, _ = r.Delete(keyNoExpire, keyExpire)
 }
 
 func TestLikeDeletes(t *testing.T) {
@@ -203,7 +203,7 @@ func TestLikeDeletes(t *testing.T) {
 	}
 
 	// Cleanup before test
-	r.Delete(keys...)
+	_, _ = r.Delete(keys...)
 
 	// Set all keys
 	for _, k := range keys {
@@ -225,7 +225,6 @@ func TestLikeDeletes(t *testing.T) {
 	_, err = r.Get("test:likedelete:123_param_456:5")
 	assert.Equal(t, redis.Nil, err)
 
-
 	// Verify keys that should NOT be deleted
 	val, err := r.Get("test:likedelete:paRAm:2")
 	assert.NoError(t, err)
@@ -235,7 +234,6 @@ func TestLikeDeletes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "val", string(val))
 
-
 	// Cleanup
-	r.Delete(keys...)
+	_, _ = r.Delete(keys...)
 }
