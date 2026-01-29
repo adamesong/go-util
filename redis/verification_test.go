@@ -30,9 +30,11 @@ func TestGetSetUserEmailVerifyCode(t *testing.T) {
 	key := GetUserEmailCacheKey(userID, email)
 
 	// Teardown: ensure key is deleted after test
-	defer r.Delete(key)
+	defer func() {
+		_, _ = r.Delete(key)
+	}()
 	// Setup: ensure key does not exist before test
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// First time setting the code
 	code, err := v.GetSetUserEmailVerifyCode(userID, email)
@@ -68,9 +70,11 @@ func TestGetSetEmailVerifyCode(t *testing.T) {
 	key := GetEmailCacheKey(email)
 
 	// Teardown: ensure key is deleted after test
-	defer r.Delete(key)
+	defer func() {
+		_, _ = r.Delete(key)
+	}()
 	// Setup: ensure key does not exist before test
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// First time setting the code
 	code, err := v.GetSetEmailVerifyCode(email)
@@ -106,9 +110,11 @@ func TestVerifyCode(t *testing.T) {
 	code := "123456"
 
 	// Teardown
-	defer r.Delete(key)
+	defer func() {
+		_, _ = r.Delete(key)
+	}()
 	// Setup
-	r.Delete(key)
+	_, _ = r.Delete(key)
 
 	// 1. Set the code
 	err := r.Set(key, code, 5*time.Second)
